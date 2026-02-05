@@ -3,6 +3,7 @@ import sys
 from zipfile import ZipFile
 from pathlib import Path, PurePosixPath
 from lxml import etree
+import last_folder
 
 def find_opf_path(z):
     try:
@@ -179,8 +180,7 @@ def analyze_epub(path):
             toc_covers_few_files = (
                 toc_targets and
                 (len(distinct_target_files) <= 2 or
-                 len(distinct_target_files) / len(spine_files) < 0.15)
-            )
+                 len(distinct_target_files) / len(spine_files) < 0.15))
             mid_index = len(spine_files) // 2
             repetitive, total_blocks, unique_blocks = analyze_dom_repetition(z, spine_files[mid_index])
             if not has_machine_toc and single_file_dominates:
@@ -207,7 +207,12 @@ def main(folder):
         if reasons and reasons != ['ok']:
             print(f"{epub.name}: {', '.join(reasons)}")
 
-if __name__ == '__main__':
-    folder = input('Input folder: ') or '/home/l/Desktop/epub original fixed metadata/'#'.'
+if __name__ == "__main__":
+    default = last_folder.get_last_folder()
+    user_input = input(f'Input folder ({default}): ').strip()
+    folder = user_input or default
+    if not folder:
+        folder = '.'
+    last_folder.save_last_folder(folder)
     main(folder)
 
