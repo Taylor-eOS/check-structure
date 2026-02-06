@@ -7,6 +7,7 @@ import last_folder_helper
 SEARCH_STRINGS = ["oceanofpdf", "steelrat", "are belong to us"]
 printKeyError = False
 reportnooccurrences = False
+print_warnings = False
 
 def find_opf_path(z):
     try:
@@ -16,7 +17,7 @@ def find_opf_path(z):
             if rootfile is not None:
                 return rootfile.get('full-path')
     except Exception as e:
-        print(f"Warning: Error reading container.xml: {e}")
+        if print_warnings: print(f"Warning: Error reading container.xml: {e}")
     for name in z.namelist():
         if name.lower().endswith('.opf'):
             return name
@@ -57,7 +58,7 @@ def parse_opf(z, opf_path):
 def resolve_href(opf_dir, href):
     clean_href = PurePosixPath(href)
     if '..' in clean_href.parts:
-        print(f"Warning: Skipping path with '..' components: {href}")
+        if print_warnings: print(f"Warning: Skipping path with '..' components: {href}")
         return None
     if not opf_dir:
         return clean_href.as_posix()
@@ -80,7 +81,7 @@ def extract_clean_text(data_bytes):
         clean_text = ' '.join(clean_text.split())
         return clean_text.lower()
     except Exception as e:
-        print(f"Warning: Error parsing content: {e}")
+        if print_warnings: print(f"Warning: Error parsing content: {e}")
         try:
             return data_bytes.decode('utf-8', errors='ignore').lower()
         except:
@@ -92,7 +93,7 @@ def analyze_epub_strings(epub_path):
         with ZipFile(epub_path, 'r') as z:
             opf_path = find_opf_path(z)
             if not opf_path:
-                print(f"Warning: No OPF file found in {epub_path}")
+                if print_warnings: print(f"Warning: No OPF file found in {epub_path}")
                 return findings
             manifest, spine, opf_dir = parse_opf(z, opf_path)
             content_files = []
@@ -115,13 +116,13 @@ def analyze_epub_strings(epub_path):
                         findings[s] += text.count(s.lower())
                 except KeyError:
                     if printKeyError:
-                        print(f"Warning: File not found in archive: {cf}")
+                        if print_warnings: print(f"Warning: File not found in archive: {cf}")
                     continue
                 except Exception as e:
-                    print(f"Warning: Error reading {cf}: {e}")
+                    if print_warnings: print(f"Warning: Error reading {cf}: {e}")
                     continue
     except Exception as e:
-        print(f"Warning: Error processing {epub_path}: {e}")
+        if print_warnings: print(f"Warning: Error processing {epub_path}: {e}")
     return findings
 
 def main(folder):
@@ -136,12 +137,10 @@ def main(folder):
     for epub in epub_paths:
         results = analyze_epub_strings(str(epub))
         found = {s: c for s, c in results.items() if c > 0}
-        print(f"{epub.stem}:")
         if found:
+            print(f"{epub.stem}:")
             for s, count in sorted(found.items(), key=lambda x: -x[1]):
                 print(f"  \"{s}\" appears {count} times")
-        else:
-            if reportnooccurrences: print("   no occurrences of the search strings found")
 
 if __name__ == "__main__":
     default = last_folder_helper.get_last_folder()
