@@ -148,7 +148,7 @@ if __name__ == "__main__":
     folder = user_input or default
     if not folder:
         folder = '.'
-    output_input = input('Output folder (covers): ').strip()
+    output_input = user_input + '_covers'
     output_folder = output_input or 'covers'
     last_folder_helper.save_last_folder(folder)
     print()
