@@ -159,10 +159,7 @@ def extract_ncx_entries(z, opf_dir, manifest, spine_toc):
                 if href:
                     entries.append({'href': href, 'text': text, 'source': ncx_href})
             return entries
-    except Exception as e:
-        import traceback
-        print(f"NCX extraction error: {e}")
-        traceback.print_exc()
+    except Exception:
         return []
 
 def get_content_files(z, manifest, spine, opf_dir):
@@ -278,31 +275,11 @@ def analyze_epub_single_chapter(path, debug=False):
             if not toc_analysis['has_toc']:
                 reasons.append('no_toc')
                 return reasons
-            if toc_analysis['content_entries'] == 0:
+            content_entry_count = toc_analysis['content_entries']
+            if content_entry_count == 0:
                 reasons.append('toc_has_no_content_entries')
-                return reasons
-            if toc_analysis['content_entries'] == 1:
-                if num_content_files > 1:
-                    reasons.append('single_toc_entry_multiple_files')
-                else:
-                    target_file = toc_analysis['single_file_target']
-                    if target_file:
-                        heading_count = count_headings_in_file(z, target_file)
-                        text_length = get_text_length(z, target_file)
-                        if text_length > 20000 and heading_count < 3:
-                            reasons.append('single_toc_entry_no_internal_structure')
-            if toc_analysis['unique_targets'] == 1 and toc_analysis['content_entries'] >= 2:
-                target_file = toc_analysis['single_file_target']
-                if target_file and num_content_files > 1:
-                    reasons.append('all_toc_entries_point_to_same_file')
-                elif target_file:
-                    heading_count = count_headings_in_file(z, target_file)
-                    if heading_count < toc_analysis['content_entries'] * 0.6:
-                        reasons.append('toc_entries_missing_target_headings')
-            if toc_analysis['content_entries'] >= 2 and num_content_files >= 3:
-                coverage_ratio = toc_analysis['unique_targets'] / num_content_files
-                if coverage_ratio < 0.15:
-                    reasons.append('toc_covers_minimal_content')
+            elif content_entry_count == 1:
+                reasons.append('single_toc_entry')
             return reasons if reasons else []
     except Exception as e:
         return ['error_parsing_epub']
@@ -335,3 +312,4 @@ if __name__ == "__main__":
     last_folder_helper.save_last_folder(folder)
     debug_mode = '--debug' in sys.argv
     main(folder, debug=debug_mode)
+
