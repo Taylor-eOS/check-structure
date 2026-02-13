@@ -248,7 +248,7 @@ def analyze_dom_structure(z, candidate_path):
         return {'has_headings': False}
 
 def main(folder):
-    print(f'Checking if files have likely TOC issues.')
+    print(f'Checking if files have likely TOC issues:')
     p = Path(folder).expanduser().resolve()
     if not p.is_dir():
         print(f"Folder not found: {p}")
@@ -260,7 +260,7 @@ def main(folder):
     for epub in epub_paths:
         reasons = analyze_epub(str(epub))
         if reasons and reasons != ['ok']:
-            print(f"{epub.name.strip('.epub')}: {', '.join(reasons)}")
+            print(f"{epub.name.replace('.epub', '')[:25]}: {', '.join(reasons)}")
 
 if __name__ == "__main__":
     default = last_folder_helper.get_last_folder()
