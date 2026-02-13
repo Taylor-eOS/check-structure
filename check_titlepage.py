@@ -1,11 +1,9 @@
 from pathlib import Path, PurePosixPath
 from lxml import etree
 import zipfile
-import io
-from PIL import Image
 import last_folder_helper
 
-print_yes = False
+print_yes = True
 
 def find_opf_path(z):
     try:
@@ -96,49 +94,61 @@ def main(epub_folder):
                 lower_basename = basename.lower()
                 book_title = root.xpath('.//dc:title/text()', namespaces={'dc': 'http://purl.org/dc/elements/1.1/'})
                 book_title = book_title[0].strip() if book_title else ""
-                has_dedicated = 'titlepage' in lower_basename
+                has_dedicated = 'titlepage' in lower_basename or 'cover' in lower_basename
                 contains_title = False
-                text_len = 0
-                has_large_image = False
+                has_svg = False
+                has_cover_class = False
+                has_cover_image_name = False
                 if not has_dedicated:
                     try:
                         with z.open(first_zip_path) as f:
                             content_tree = etree.parse(f, etree.XMLParser(recover=True))
-                            full_text = ' '.join(t.strip() for t in content_tree.itertext() if t.strip())
-                            text_len = len(full_text)
-                            if book_title:
-                                contains_title = book_title.lower() in full_text.lower()
                             xhtml_ns = 'http://www.w3.org/1999/xhtml'
                             svg_ns = 'http://www.w3.org/2000/svg'
                             xlink_ns = 'http://www.w3.org/1999/xlink'
+                            svg_els = content_tree.findall(f'.//{{{xhtml_ns}}}svg')
+                            if not svg_els:
+                                svg_els = content_tree.findall(f'.//{{{svg_ns}}}svg')
+                            has_svg = len(svg_els) > 0
+                            all_els = content_tree.findall(f'.//*')
+                            for el in all_els:
+                                class_attr = el.get('class', '')
+                                id_attr = el.get('id', '')
+                                if 'cover' in class_attr.lower() or 'cover' in id_attr.lower():
+                                    has_cover_class = True
+                                    break
+                            text_nodes = [t.strip() for t in content_tree.itertext() if t.strip()]
+                            full_text = ' '.join(text_nodes)
+                            if book_title:
+                                contains_title = book_title.lower() in full_text.lower()
                             img_els = content_tree.findall(f'.//{{{xhtml_ns}}}img')
-                            svg_img_els = content_tree.findall(f'.//{{{xhtml_ns}}}svg/{{{svg_ns}}}image')
+                            svg_img_els = content_tree.findall(f'.//{{{svg_ns}}}image')
+                            svg_img_els += content_tree.findall(f'.//{{{xhtml_ns}}}svg//{{{svg_ns}}}image')
                             image_els = img_els + svg_img_els
-                            content_dir = PurePosixPath(first_zip_path).parent.as_posix()
                             for el in image_els:
                                 src = el.get('src') or el.get(f'{{{xlink_ns}}}href')
                                 if src:
-                                    img_zip_path = resolve_href(content_dir, src)
-                                    if img_zip_path in z.namelist():
-                                        with z.open(img_zip_path) as img_f:
-                                            img_data = img_f.read()
-                                            img = Image.open(io.BytesIO(img_data))
-                                            w, h = img.size
-                                            if max(w, h) > 1200:
-                                                has_large_image = True
-                                                break
+                                    src_lower = src.lower()
+                                    if 'cover' in src_lower or 'title' in src_lower:
+                                        has_cover_image_name = True
+                                        break
                     except Exception:
                         pass
-                is_cover_like = has_large_image and text_len < 300
                 if has_dedicated:
-                    report = "yes, standard titlepage filename"
+                    report = "yes, standard titlepage/cover filename"
+                    yes_count += 1
+                elif has_svg:
+                    report = "yes, contains SVG element"
+                    yes_count += 1
+                elif has_cover_class:
+                    report = "yes, has cover class/id attribute"
+                    yes_count += 1
+                elif has_cover_image_name:
+                    report = "yes, image filename contains 'cover' or 'title'"
                     yes_count += 1
                 elif contains_title:
                     report = "yes, contains book title in text"
                     yes_count += 1
-                elif is_cover_like:
-                    report = "no, likely cover wrapper with large image"
-                    no_count += 1
                 else:
                     report = "no clear indicators"
                     no_count += 1
@@ -158,4 +168,3 @@ if __name__ == "__main__":
     last_folder_helper.save_last_folder(folder)
     print()
     main(folder)
-
